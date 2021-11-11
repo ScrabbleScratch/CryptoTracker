@@ -668,5 +668,3 @@ while True:
         sleep(1)
         lcd.backlight_on()
         sleep(5)
-
-
