@@ -215,7 +215,7 @@ def connect():
                 with open("networks.json", "r") as f:
                     net = json.loads(f.read())
                     ssid = list(net.keys())
-                    print("Saved: "+str(ssid))
+                    print("Saved networks: "+str(ssid))
                 del f
                 break
             except OSError as e:
@@ -364,7 +364,7 @@ def addSymbol():
                     with open("symbols.json", "w") as f:
                         f.write(json.dumps(symbols))
                     del f
-                    print("Symbol saved!")
+                    print("Symbol saved: "+symbol)
                     lcd.clear()
                     lcd.putstr("Symbol saved!")
                 else:
@@ -387,14 +387,12 @@ def addSymbol():
         print("Not connected!")
         lcd.clear()
         lcd.putstr("Not connected!")
-        sleep(1)
-        return
     del symbols
     sleep(1)
     return
 
-def removePair():
-    print("removePair()")
+def removeSymbol():
+    print("removeSymbol()")
     # look for saved symbols
     symbols = symbolsList()
     # remove symbol from the system
@@ -461,7 +459,8 @@ def trackSingle(symbol=False):
             lcd.putstr("No symbols found!")
             sleep(1)
             addSymbol()
-            trackSingle()
+            #trackSingle()
+            return
         # select symbol to track
         symbol = menuSel(list(symbolsInfo.keys()) + ["(RETURN)"], "Select symbol:")
     if not symbol == "(RETURN)":
@@ -478,8 +477,8 @@ def trackSingle(symbol=False):
             val_new = r.value()
             # if rotary encoder is moved call the main menu
             if val_old != val_new:
-                mainMenu()
-                trackSingle(symbol)
+                # save default state to return to mainMenu
+                saveState()
                 return
             if timer >= 5000:
                 timer = 0
@@ -507,9 +506,12 @@ def trackSingle(symbol=False):
 
 def trackMultiple():
     print("trackMultiple()")
+    # save state
+    saveState(option="Track multiple")
+    # load symbols
     lcd.clear()
     lcd.putstr("Loading symbols...")
-    # look for saved coin pairs
+    # look for saved symbols
     symbolsInfo = symbolsList()
     symbols = list(symbolsInfo.keys())
     # if no pair is saved create one
@@ -519,9 +521,9 @@ def trackMultiple():
         lcd.putstr("No symbols found!")
         sleep(1)
         addSymbol()
-        trackMultiple()
-    # save state
-    saveState(option="Track multiple")
+        # save default state to return to mainMenu
+        saveState()
+        return
     # track coins price
     timer = 0
     index = 0
@@ -532,8 +534,8 @@ def trackMultiple():
         val_new = r.value()
         # if rotary encoder is moved call the main menu
         if val_old != val_new:
-            mainMenu()
-            trackMultiple()
+            # save default state to return to mainMenu
+            saveState()
             return
         if timer >= 5000:
             timer = 0
@@ -560,35 +562,39 @@ def trackMultiple():
 
 def mainMenu():
     print("mainMenu()")
+    # save default state to return to mainMenu
+    saveState()
     while True:
-        selection = menuSel(["Pairs", "Track", "Screen", "Reverse knob", "(RETURN)"], "Select an option:")
-        if selection == "Pairs":
+        selection = menuSel(["Symbols", "Track", "Screen", "Reverse knob", "(RETURN)"], "Select an option:")
+        if selection == "Symbols":
             del selection
             while True:
-                print("Pair options")
-                selection = menuSel(["Add pair", "Remove pair", "(RETURN)"], "Screen options:")
-                if selection == "Add pair":
+                print("Symbols options")
+                selection = menuSel(["Add symbol", "Remove symbol", "(RETURN)"], "Symbols options:")
+                if selection == "Add symbol":
                     del selection
-                    print("Selected Add pair")
+                    print("Selected Add symbol")
                     addSymbol()
-                elif selection == "Remove pair":
+                elif selection == "Remove symbol":
                     del selection
-                    print("Selected Remove pairs")
-                    removePair()
+                    print("Selected Remove symbol")
+                    removeSymbol()
                 else: break
         elif selection == "Track":
             del selection
             while True:
                 print("Track options")
-                selection = menuSel(["Single pair", "Multiple pairs", "(RETURN)"], "Screen options:")
-                if selection == "Single pair":
+                selection = menuSel(["Single symbol", "Multiple symbols", "(RETURN)"], "Screen options:")
+                if selection == "Single symbol":
                     del selection
-                    print("Selected Single pair")
+                    print("Selected Single symbol")
                     trackSingle()
-                elif selection == "Multiple pairs":
+                    break
+                elif selection == "Multiple symbols":
                     del selection
-                    print("Selected Multiple pairs")
+                    print("Selected Multiple symbols")
                     trackMultiple()
+                    break
                 else: break
         elif selection == "Screen":
             del selection
@@ -612,12 +618,7 @@ def mainMenu():
             clkPin = tdt
             dtPin = tclk
             del tclk,tdt
-            r = RotaryIRQ(pin_num_clk=clkPin,
-                          pin_num_dt=dtPin,
-                          min_val=0,
-                          max_val=0,
-                          reverse=False,
-                          range_mode=RotaryIRQ.RANGE_WRAP)
+            r = RotaryIRQ(pin_num_clk=clkPin, pin_num_dt=dtPin, min_val=0, max_val=0, reverse=False, range_mode=RotaryIRQ.RANGE_WRAP)
         else:
             break
     return
@@ -625,36 +626,34 @@ def mainMenu():
 #####################################################################################################################
 
 while True:
-    while wlan.isconnected():
-        print("Main loop!")
-        state = loadState()
-        if state["option"] == "Track single":
-            if state["symbol"]:
-                trackSingle(state["symbol"])
+    try:
+        while wlan.isconnected():
+            print("Main loop!")
+            state = loadState()
+            if state["option"] == "Track single":
+                if state["symbol"]:
+                    trackSingle(state["symbol"])
+                else:
+                    trackSingle()
+            elif state["option"] == "Track multiple":
+                trackMultiple()
             else:
-                trackSingle()
-        elif state["option"] == "Track multiple":
-            trackMultiple()
+                mainMenu()
         else:
-            mainMenu()
-    else:
-        print("Couldn't connect to the internet!")
+            print("Couldn't connect to the internet!")
+            lcd.clear()
+            lcd.putstr("Couldn't connect to the internet!")
+            connect()
+    except Exception as e:
+        print(f"Unknown error! ({e.errno}) Please reset the system.")
+        #print(e)
         lcd.clear()
-        lcd.putstr("Couldn't connect to the internet!")
-        connect()
-
-try:
-    pass
-except Exception as e:
-    #print(f"Unknown error! ({e.errno}) Please reset the system.")
-    print(e)
-    lcd.clear()
-    lcd.putstr("Unknown error!")
-    lcd.move_to(0,1)
-    lcd.putstr(str(e.errno))
-    lcd.move_to(0,3)
-    lcd.putstr("Please reset system!")
-    lcd.backlight_off()
-    sleep(1)
-    lcd.backlight_on()
-
+        lcd.putstr("Unknown error!")
+        lcd.move_to(0,1)
+        lcd.putstr(str(e.errno))
+        lcd.move_to(0,3)
+        lcd.putstr("Please reset system!")
+        lcd.backlight_off()
+        sleep(1)
+        lcd.backlight_on()
+        sleep(5)
