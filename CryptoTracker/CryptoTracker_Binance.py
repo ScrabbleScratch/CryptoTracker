@@ -21,11 +21,12 @@ lcd.display_on()
 
 # create custom characters
 # right arrow character
-lcd.custom_char(0, bytearray([0x00, 0x04, 0x06, 0x1F, 0x1F, 0x06, 0x04, 0x00]))
-lcd.custom_char(1, bytearray([0x04,0x0E,0x1F,0x04,0x04,0x04,0x04,0x04]))
-lcd.custom_char(2, bytearray([0x04,0x04,0x04,0x04,0x04,0x1F,0x0E,0x04]))
-lcd.custom_char(3, bytearray([0x00,0x01,0x01,0x01,0x01,0x01,0x01,0x00]))
-lcd.custom_char(4, bytearray([0x00,0x10,0x10,0x10,0x10,0x10,0x10,0x00]))
+lcd.custom_char(0, bytearray([0x10,0x18,0x1C,0x1E,0x1E,0x1C,0x18,0x10]))
+lcd.custom_char(1, bytearray([0x01,0x03,0x07,0x0F,0x0F,0x07,0x03,0x01]))
+lcd.custom_char(2, bytearray([0x04,0x0E,0x1F,0x04,0x04,0x04,0x04,0x04]))
+lcd.custom_char(3, bytearray([0x04,0x04,0x04,0x04,0x04,0x1F,0x0E,0x04]))
+lcd.custom_char(4, bytearray([0x00,0x01,0x01,0x01,0x01,0x01,0x01,0x00]))
+lcd.custom_char(5, bytearray([0x00,0x10,0x10,0x10,0x10,0x10,0x10,0x00]))
 
 # display welcome message
 lcd.putstr("""\
@@ -225,7 +226,7 @@ def connect():
                         f.write("{}")
                     del f
                 else:
-                    print("Unknown error!")
+                    print("Unknown error! (connect)")
                     raise Exception
         lcd.clear()
         lcd.putstr("Scanning networks...")
@@ -295,7 +296,7 @@ def saveState(option=False, symbol=False):
             del f,state
             break
         except OSError as e:
-            print("Something happened while saving state!")
+            print("Something happened while saving state! (saveState)")
             lcd.clear()
             lcd.putstr("Something happened!")
             sleep(1)
@@ -318,11 +319,12 @@ def loadState():
                 print("State not found!")
                 saveState()
             else:
-                print("Unknown error!")
+                print("Unknown error! (loadState)")
                 raise Exception
     return state
 
 def symbolsList():
+    print("symbolsList()")
     # look for saved symbols
     while True:
         try:
@@ -338,7 +340,7 @@ def symbolsList():
                     f.write("{}")
                 del f
             else:
-                print("Unknown error!")
+                print("Unknown error! (symbolsList)")
                 raise Exception
     return symbols
 
@@ -416,7 +418,7 @@ def removeSymbol():
                     sleep(1)
                     break
                 except OSError as e:
-                    print("removePair unknown error!")
+                    print("Unknown error! (removeSymbol)")
                     raise Exception
         else: break
     del symbols,symbols_opts
@@ -428,21 +430,41 @@ def showPrice(data, symbolInfo):
     lcd.clear()
     lcd.putstr(f"{symbolInfo['baseAsset']}/{symbolInfo['quoteAsset']}".center(20))
     lcd.move_to(0,1)
-    lcd.putstr(f"> {float(data['lastPrice'])} <".center(20))
+    lcd.putstr(f"{chr(0)} {float(data['lastPrice'])} {chr(1)}".center(20))
     lcd.move_to(0,2)
-    lcd.putstr(f"{chr(1)}{float(data['highPrice'])}")
+    lcd.putstr(f"{chr(2)}{float(data['highPrice'])}")
     lcd.move_to(9,2)
-    lcd.putstr(chr(3)+chr(4))
+    lcd.putstr(chr(4)+chr(5))
     lcd.move_to(11,2)
     lcd.putstr(f"24hr".center(9))
     lcd.move_to(0,3)
-    lcd.putstr(f"{chr(2)}{float(data['lowPrice'])}")
+    lcd.putstr(f"{chr(3)}{float(data['lowPrice'])}")
     lcd.move_to(9,3)
-    lcd.putstr(chr(3)+chr(4))
+    lcd.putstr(chr(4)+chr(5))
     lcd.move_to(11,3)
     lcd.putstr(f"{float(data['priceChangePercent'])}%".center(9))
     del data,symbolInfo
     return
+
+def requestPrice(symbol, option):
+    print("requestPrice()")
+    data = False
+    # request symbol price to api
+    while True:
+        try:
+            print("Requesting: "+symbol, end=" ")
+            data = rq.get(apiBase + f"/ticker/24hr?symbol={symbol}")
+            # if status code is 200 return data
+            if data.status_code == 200:
+                print("(200)")
+                data = data.json()
+                break
+            else:
+                print(f"({data.status_code})")
+        except:
+            print(f"An error happened while requesting price! (requestPrice: {option})")
+            #raise Exception("Error requesting single price!")
+    return data
 
 def trackSingle(symbol=False):
     print("trackSingle()")
@@ -472,24 +494,17 @@ def trackSingle(symbol=False):
         lcd.putstr("Loading symbol...")
         r.set(min_val=0, max_val=50, value=0)
         val_old = r.value()
-        #while True:
         while wlan.isconnected():
             val_new = r.value()
-            # if rotary encoder is moved call the main menu
+            # if rotary encoder is moved call the maiMenu
             if val_old != val_new:
                 # save default state to return to mainMenu
                 saveState()
-                return
+                break
             if timer >= 5000:
                 timer = 0
-                # show each saved coin pair current price
-                while True:
-                    try:
-                        data = rq.get(apiBase + f"/ticker/24hr?symbol={symbol}").json()
-                        break
-                    except:
-                        print("An error happende while requesting price! (Single)")
-                        raise Exception("Error requesting single price!")
+                # show selected symbol current price
+                data = requestPrice(symbol, "trackSingle")
                 showPrice(data, symbolsInfo[symbol])
             sleep_ms(50)
             timer += 50
@@ -497,10 +512,8 @@ def trackSingle(symbol=False):
             print("Not connected!")
             lcd.clear()
             lcd.putstr("Not connected!")
+            del timer,val_old
             sleep(1)
-            return
-    else:
-        mainMenu()
     del symbolsInfo
     return
 
@@ -514,7 +527,7 @@ def trackMultiple():
     # look for saved symbols
     symbolsInfo = symbolsList()
     symbols = list(symbolsInfo.keys())
-    # if no pair is saved create one
+    # if no symbol is saved create one
     if not len(symbols):
         print("No symbols found!")
         lcd.clear()
@@ -524,31 +537,23 @@ def trackMultiple():
         # save default state to return to mainMenu
         saveState()
         return
-    # track coins price
+    # track symbols price
     timer = 0
     index = 0
     r.set(min_val=0, max_val=50, value=0)
     val_old = r.value()
-    #while True:
     while wlan.isconnected():
         val_new = r.value()
-        # if rotary encoder is moved call the main menu
+        # if rotary encoder is moved call mainMenu
         if val_old != val_new:
             # save default state to return to mainMenu
             saveState()
-            return
+            break
         if timer >= 5000:
             timer = 0
             # show each saved symbol current data
-            symbol = symbols[index]
-            while True:
-                try:
-                    data = rq.get(apiBase + f"/ticker/24hr?symbol={symbol}").json()
-                    break
-                except:
-                    print("An error happened while requesting price! (Multiple)")
-                    raise Exception("Error requesting multiple price!")
-            showPrice(data, symbolsInfo[symbol])
+            data = requestPrice(symbols[index], "trackMultiple")
+            showPrice(data, symbolsInfo[symbols[index]])
             if index == len(symbols)-1: index = 0
             else: index += 1
         sleep_ms(50)
@@ -558,6 +563,7 @@ def trackMultiple():
         lcd.clear()
         lcd.putstr("Not connected!")
         sleep(1)
+    del symbolsInfo,symbols,timer,index,val_old
     return
 
 def mainMenu():
@@ -565,7 +571,7 @@ def mainMenu():
     # save default state to return to mainMenu
     saveState()
     while True:
-        selection = menuSel(["Symbols", "Track", "Screen", "Reverse knob", "(RETURN)"], "Select an option:")
+        selection = menuSel(["Symbols", "Track", "Screen", "Reverse knob"], "Select an option:")
         if selection == "Symbols":
             del selection
             while True:
