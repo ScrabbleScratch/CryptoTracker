@@ -11,7 +11,7 @@ try:
     with open("mqtt.txt", "x"):
         print("mqtt.txt created")
     with open("mqtt.txt", "w") as f:
-        f.write("DEFAULT.MQTT.BROKER.URL")
+        f.write("mq.makeblock.com")
 except:pass
 
 # load broker url from file
@@ -22,8 +22,8 @@ with open("mqtt.txt", "r") as f:
 # mqtt broker url
 clientId = ubinascii.hexlify(unique_id())
 #brokerUrl = "mq.makeblock.com"
-requestTopic = "/MQTT/TOPIC/TO/REQUEST/PRICE"
-dataTopic = "/MQTT/TOPIC/TO/RECIEVE/PRICE/DATA"+clientId.decode()
+requestTopic = "/cryptotracker/binance/price/request"
+dataTopic = "/cryptotracker/binance/price/data/"+clientId.decode()
 validationKey = "symbol"
 
 # api base url
@@ -572,7 +572,7 @@ def trackSingle(symbol=False):
             lcd.putstr("Not connected!")
             del timer,val_old
             sleep(1)
-    client.disconnect()
+        client.disconnect()
     del symbolsInfo
     return
 
