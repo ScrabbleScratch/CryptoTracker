@@ -487,7 +487,7 @@ def showPrice(data, symbolInfo):
     lcd.move_to(9,3)
     lcd.putstr(chr(4)+chr(5))
     lcd.move_to(11,3)
-    lcd.putstr(f"{float(data['priceChangePercent'])}%".center(9))
+    lcd.putstr(f"{round(float(data['priceChangePercent']),2)}%".center(9))
     del data,symbolInfo
     return
 
